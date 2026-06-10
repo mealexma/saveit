@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Saved It!</title>
+<meta name="description" content="Log the money you didn't spend. A feel-good tracker of resisted temptations.">
+<meta name="theme-color" content="#f4faf7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1411" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Saved It">
+<style>
+  :root {
+    --bg: #f4faf7;
+    --bg-grad: radial-gradient(120% 60% at 50% -10%, rgba(16,185,129,.14), transparent 60%);
+    --card: #ffffff;
+    --text: #122019;
+    --muted: #5f7268;
+    --faint: #93a69c;
+    --accent: #10b981;
+    --accent-deep: #059669;
+    --accent-soft: rgba(16,185,129,.13);
+    --danger: #ef4444;
+    --border: rgba(18,32,25,.08);
+    --shadow: 0 10px 30px rgba(18,32,25,.10);
+    --shadow-soft: 0 2px 12px rgba(18,32,25,.06);
+    --sheet-bg: #ffffff;
+    --bar-track: rgba(18,32,25,.06);
+    --tap: rgba(16,185,129,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c1411;
+      --bg-grad: radial-gradient(120% 60% at 50% -10%, rgba(16,185,129,.12), transparent 60%);
+      --card: #15211b;
+      --text: #e9f5ee;
+      --muted: #93aa9d;
+      --faint: #5f7268;
+      --accent: #34d399;
+      --accent-deep: #10b981;
+      --accent-soft: rgba(52,211,153,.14);
+      --danger: #f87171;
+      --border: rgba(233,245,238,.09);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --shadow-soft: 0 2px 12px rgba(0,0,0,.25);
+      --sheet-bg: #18261f;
+      --bar-track: rgba(233,245,238,.08);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { overscroll-behavior: none; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; -webkit-user-select: none; user-select: none; }
+  input, select { font: inherit; color: inherit; }
+
+  /* ---------- Layout ---------- */
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100%;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) max(16px, env(safe-area-inset-left, 0px)) calc(env(safe-area-inset-bottom, 0px) + 96px) max(16px, env(safe-area-inset-right, 0px));
+  }
+  .view { display: none; animation: viewIn .32s cubic-bezier(.22,1,.36,1); }
+  .view.active { display: block; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- Home ---------- */
+  .home-head { display: flex; justify-content: center; padding-top: 6px; min-height: 36px; }
+  .streak-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-soft); color: var(--accent-deep);
+    font-weight: 700; font-size: 14px; letter-spacing: .01em;
+    padding: 7px 14px; border-radius: 999px;
+    opacity: 0; transform: scale(.8);
+    transition: opacity .3s, transform .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  @media (prefers-color-scheme: dark) { .streak-pill { color: var(--accent); } }
+  .streak-pill.show { opacity: 1; transform: scale(1); }
+
+  .total-wrap { text-align: center; padding: 26px 0 8px; }
+  .total-label {
+    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .total {
+    font-size: clamp(44px, 15vw, 64px);
+    font-weight: 800; letter-spacing: -.03em; line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .total.pop { animation: totalPop .6s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes totalPop { 0% { transform: scale(1); } 35% { transform: scale(1.12); color: var(--accent); } 100% { transform: scale(1); } }
+  .total-sub { color: var(--faint); font-size: 14px; margin-top: 8px; }
+
+  .save-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; margin: 26px 0 8px;
+    padding: 18px;
+    font-size: 19px; font-weight: 800; letter-spacing: .01em;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+    border-radius: 22px;
+    box-shadow: 0 8px 24px rgba(16,185,129,.35);
+    transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
+  }
+  .save-btn:active { transform: scale(.96); box-shadow: 0 4px 14px rgba(16,185,129,.3); }
+  .save-btn .plus { font-size: 24px; line-height: 1; font-weight: 700; margin-top: -2px; }
+
+  .history { margin-top: 26px; }
+  .section-title {
+    font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--muted); margin-bottom: 10px; padding-left: 4px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .section-title .count { color: var(--faint); letter-spacing: 0; text-transform: none; font-weight: 600; }
+
+  #historyList { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .entry {
+    position: relative; border-radius: 18px; overflow: hidden;
+    background: var(--danger);
+  }
+  .entry .swipe-hint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 22px; color: #fff; font-size: 20px;
+  }
+  .entry-card {
+    position: relative; display: flex; align-items: center; gap: 12px;
+    background: var(--card); border-radius: 18px;
+    padding: 14px 16px; min-height: 60px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--border);
+    touch-action: pan-y;
+    transition: transform .35s cubic-bezier(.34,1.4,.64,1);
+    will-change: transform;
+  }
+  .entry-card.dragging { transition: none; }
+  .entry.removing { animation: entryOut .3s cubic-bezier(.4,0,.7,.2) forwards; }
+  @keyframes entryOut { to { opacity: 0; transform: translateX(-30%) scale(.92); max-height: 0; } }
+  .entry.adding { animation: entryIn .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes entryIn { from { opacity: 0; transform: translateY(-12px) scale(.95); } to { opacity: 1; transform: none; } }
+
+  .entry-emoji {
+    width: 40px; height: 40px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); border-radius: 13px; font-size: 19px;
+  }
+  .entry-main { flex: 1; min-width: 0; }
+  .entry-label { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-date { font-size: 13px; color: var(--faint); margin-top: 2px; }
+  .entry-amount { font-weight: 800; font-size: 17px; color: var(--accent-deep); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (prefers-color-scheme: dark) { .entry-amount { color: var(--accent); } }
+  .entry-del {
+    flex: none; width: 34px; height: 34px; border-radius: 10px;
+    display: none; align-items: center; justify-content: center;
+    color: var(--faint); font-size: 17px;
+  }
+  .entry-del:active { background: var(--bar-track); }
+  @media (hover: hover) {
+    .entry-del { display: flex; opacity: 0; transition: opacity .15s; }
+    .entry-card:hover .entry-del { opacity: 1; }
+    .entry-del:hover { color: var(--danger); background: var(--bar-track); }
+  }
+
+  .empty {
+    text-align: center; padding: 38px 20px; color: var(--faint);
+    border: 2px dashed var(--border); border-radius: 22px;
+  }
+  .empty .big { font-size: 42px; margin-bottom: 10px; }
+  .empty p { font-size: 15px; line-height: 1.5; }
+  .empty strong { color: var(--muted); }
+
+  /* ---------- Stats ---------- */
+  .page-title { font-size: 28px; font-weight: 800; letter-spacing: -.02em; padding: 8px 4px 18px; }
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .stat-card {
+    background: var(--card); border-radius: 20px; padding: 16px;
+    border: 1px solid var(--border); box-shadow: var(--shadow-soft);
+  }
+  .stat-card.wide { grid-column: 1 / -1; }
+  .stat-kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat-value.accent { color: var(--accent-deep); }
+  @media (prefers-color-scheme: dark) { .stat-value.accent { color: var(--accent); } }
+  .stat-sub { font-size: 13px; color: var(--faint); margin-top: 3px; }
+
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 130px; padding-top: 8px; }
+  .chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+  .chart-bar-track { width: 100%; flex: 1; display: flex; align-items: flex-end; border-radius: 8px; }
+  .chart-bar {
+    width: 100%; border-radius: 8px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+    min-height: 3px;
+    transform-origin: bottom;
+    animation: barUp .7s cubic-bezier(.34,1.3,.64,1) backwards;
+  }
+  .chart-col:nth-child(odd) .chart-bar { animation-delay: .05s; }
+  .chart-bar.zero { background: var(--bar-track); }
+  .chart-bar.current { box-shadow: 0 0 0 2px var(--accent-soft); }
+  @keyframes barUp { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  .chart-label { font-size: 10px; font-weight: 700; color: var(--faint); text-transform: uppercase; }
+
+  /* ---------- Settings ---------- */
+  .settings-group {
+    background: var(--card); border-radius: 20px; border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft); overflow: hidden; margin-bottom: 14px;
+  }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 15px 16px; min-height: 54px; width: 100%; text-align: left;
+  }
+  .settings-row + .settings-row { border-top: 1px solid var(--border); }
+  .settings-row .row-label { font-weight: 600; font-size: 16px; }
+  .settings-row .row-sub { font-size: 13px; color: var(--faint); margin-top: 2px; }
+  .settings-row .row-value { color: var(--muted); font-size: 15px; font-weight: 600; }
+  .settings-row .row-value.good { color: var(--accent-deep); }
+  @media (prefers-color-scheme: dark) { .settings-row .row-value.good { color: var(--accent); } }
+  button.settings-row:active { background: var(--bar-track); }
+  .settings-row.danger .row-label { color: var(--danger); }
+  select.currency-select {
+    background: var(--bar-track); border: none; border-radius: 10px;
+    padding: 8px 10px; font-size: 16px; font-weight: 600; color: var(--text);
+    max-width: 55%;
+  }
+  .settings-note { text-align: center; color: var(--faint); font-size: 13px; padding: 6px 16px 0; line-height: 1.5; }
+
+  /* ---------- Tab bar ---------- */
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    display: flex; justify-content: center;
+    padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 10px);
+    pointer-events: none;
+  }
+  .tabbar-inner {
+    pointer-events: auto;
+    display: flex; gap: 4px;
+    background: var(--card);
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px;
+    box-shadow: var(--shadow);
+  }
+  .tab-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 84px; padding: 8px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; color: var(--faint);
+    transition: color .2s, background .2s, transform .25s cubic-bezier(.34,1.56,.64,1);
+  }
+  .tab-btn .tab-ico { font-size: 19px; line-height: 1; filter: grayscale(1) opacity(.55); transition: filter .2s; }
+  .tab-btn.active { color: var(--accent-deep); background: var(--accent-soft); }
+  .tab-btn.active .tab-ico { filter: none; }
+  @media (prefers-color-scheme: dark) { .tab-btn.active { color: var(--accent); } }
+  .tab-btn:active { transform: scale(.92); }
+
+  /* ---------- Save sheet ---------- */
+  .backdrop {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(8, 16, 12, .45);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .backdrop.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    max-width: 480px; margin: 0 auto;
+    background: var(--sheet-bg);
+    border-radius: 28px 28px 0 0;
+    padding: 14px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    box-shadow: 0 -12px 40px rgba(0,0,0,.18);
+    transform: translateY(110%);
+    transition: transform .42s cubic-bezier(.32,1.25,.45,1);
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--bar-track); margin: 0 auto 14px; }
+  .sheet h2 { font-size: 20px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 16px; text-align: center; }
+  .amount-row {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--bar-track); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px;
+    border: 2px solid transparent; transition: border-color .2s;
+  }
+  .amount-row:focus-within { border-color: var(--accent); }
+  .amount-row.shake { animation: shake .4s; border-color: var(--danger); }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  .amount-cur { font-size: 22px; font-weight: 800; color: var(--faint); flex: none; }
+  #amountInput {
+    background: transparent; border: none; outline: none;
+    font-size: 34px; font-weight: 800; letter-spacing: -.02em;
+    width: 100%; min-width: 0; text-align: center;
+    font-variant-numeric: tabular-nums;
+    caret-color: var(--accent);
+  }
+  #amountInput::placeholder { color: var(--faint); font-weight: 700; }
+  #labelInput {
+    width: 100%; background: var(--bar-track); border: 2px solid transparent; outline: none;
+    border-radius: 16px; padding: 14px 16px; font-size: 16px; font-weight: 600;
+    margin-bottom: 14px; transition: border-color .2s;
+  }
+  #labelInput:focus { border-color: var(--accent); }
+  #labelInput::placeholder { color: var(--faint); font-weight: 500; }
+  .sheet-actions { display: flex; gap: 10px; }
+  .btn-secondary {
+    flex: 1; padding: 16px; border-radius: 18px; font-weight: 700; font-size: 16px;
+    background: var(--bar-track); color: var(--muted);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .btn-secondary:active { transform: scale(.95); }
+  .btn-primary {
+    flex: 2; padding: 16px; border-radius: 18px; font-weight: 800; font-size: 17px;
+    color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    box-shadow: 0 6px 18px rgba(16,185,129,.35);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+  }
+  .btn-primary:active { transform: scale(.95); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); z-index: 60;
+    transform: translate(-50%, 20px) scale(.9);
+    display: flex; align-items: center; gap: 14px;
+    background: var(--text); color: var(--bg);
+    padding: 12px 18px; border-radius: 999px; font-size: 15px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .35s cubic-bezier(.34,1.56,.64,1);
+    max-width: calc(100vw - 40px); white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+  .toast button { color: var(--accent); font-weight: 800; font-size: 15px; padding: 4px 2px; }
+
+  /* ---------- Confetti ---------- */
+  #confettiCanvas { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+
+  /* ---------- Choice dialog (import) ---------- */
+  .choice {
+    position: fixed; left: 50%; top: 50%; z-index: 70;
+    transform: translate(-50%, -50%) scale(.9);
+    width: min(330px, calc(100vw - 48px));
+    background: var(--sheet-bg); border-radius: 24px; padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .3s cubic-bezier(.34,1.56,.64,1);
+    text-align: center;
+  }
+  .choice.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+  .choice h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+  .choice p { font-size: 14px; color: var(--muted); margin-bottom: 16px; line-height: 1.45; }
+  .choice .choice-btns { display: flex; flex-direction: column; gap: 8px; }
+  .choice .choice-btns button { padding: 13px; border-radius: 14px; font-weight: 700; font-size: 15px; transition: transform .2s cubic-bezier(.34,1.56,.64,1); }
+  .choice .choice-btns button:active { transform: scale(.96); }
+  .choice .c-primary { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff; }
+  .choice .c-warn { background: rgba(239,68,68,.12); color: var(--danger); }
+  .choice .c-plain { background: var(--bar-track); color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<canvas id="confettiCanvas" aria-hidden="true"></canvas>
+
+<div id="app">
+  <!-- HOME -->
+  <section class="view active" id="view-home" aria-label="Home">
+    <header class="home-head">
+      <div class="streak-pill" id="streakPill" role="status"></div>
+    </header>
+    <div class="total-wrap">
+      <div class="total-label">Total saved</div>
+      <div class="total" id="totalAmount">–</div>
+      <div class="total-sub" id="totalSub">money you didn't spend</div>
+    </div>
+    <button class="save-btn" id="openSaveBtn" aria-haspopup="dialog">
+      <span class="plus">+</span> Save
+    </button>
+    <section class="history" aria-label="History">
+      <div class="section-title">History <span class="count" id="histCount"></span></div>
+      <ul id="historyList"></ul>
+      <div class="empty" id="emptyState" hidden>
+        <div class="big">&#128717;&#65039;</div>
+        <p><strong>Nothing resisted yet.</strong><br>
+        Next time you talk yourself out of buying something, tap <strong>+ Save</strong> and brag about it here.</p>
+      </div>
+    </section>
+  </section>
+
+  <!-- STATS -->
+  <section class="view" id="view-stats" aria-label="Stats">
+    <h1 class="page-title">Stats</h1>
+    <div class="card-grid">
+      <div class="stat-card">
+        <div class="stat-kicker">This month</div>
+        <div class="stat-value accent" id="statMonthTotal">–</div>
+        <div class="stat-sub" id="statMonthCount"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-kicker">Best month</div>
+        <div class="stat-value" id="statBestMonth">–</div>
+        <div class="stat-sub" id="statBestMonthName"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-kicker">Current streak</div>
+        <div class="stat-value" id="statCurStreak">–</div>
+        <div class="stat-sub">consecutive days</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-kicker">Best streak</div>
+        <div class="stat-value" id="statBestStreak">–</div>
+        <div class="stat-sub">your record</div>
+      </div>
+      <div class="stat-card wide">
+        <div class="stat-kicker">Last 12 months</div>
+        <div class="chart" id="chart" role="img" aria-label="Monthly savings bar chart"></div>
+      </div>
+      <div class="stat-card wide">
+        <div class="stat-kicker">All time</div>
+        <div class="stat-value" id="statAllCount">–</div>
+        <div class="stat-sub" id="statAvg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings" aria-label="Settings">
+    <h1 class="page-title">Settings</h1>
+
+    <div class="settings-group">
+      <div class="settings-row">
+        <div>
+          <div class="row-label">Currency</div>
+          <div class="row-sub">Used for all amounts</div>
+        </div>
+        <select class="currency-select" id="currencySelect" aria-label="Currency"></select>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="row-label">Storage</div>
+          <div class="row-sub">Durable storage keeps data safe</div>
+        </div>
+        <div class="row-value" id="storageStatus">checking…</div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <button class="settings-row" id="exportBtn">
+        <div>
+          <div class="row-label">Export backup</div>
+          <div class="row-sub">Download all saves as JSON</div>
+        </div>
+        <div class="row-value">&#8595;</div>
+      </button>
+      <button class="settings-row" id="importBtn">
+        <div>
+          <div class="row-label">Import backup</div>
+          <div class="row-sub">Restore from a JSON file</div>
+        </div>
+        <div class="row-value">&#8593;</div>
+      </button>
+    </div>
+
+    <div class="settings-group">
+      <button class="settings-row danger" id="eraseBtn">
+        <div>
+          <div class="row-label">Erase all data</div>
+          <div class="row-sub">Cannot be undone (export first!)</div>
+        </div>
+      </button>
+    </div>
+
+    <p class="settings-note" id="aboutNote">Saved It! v1 · everything stays on this device</p>
+  </section>
+</div>
+
+<!-- Tab bar -->
+<nav class="tabbar" aria-label="Main navigation">
+  <div class="tabbar-inner">
+    <button class="tab-btn active" data-view="home" aria-label="Home">
+      <span class="tab-ico">&#128176;</span>Home
+    </button>
+    <button class="tab-btn" data-view="stats" aria-label="Stats">
+      <span class="tab-ico">&#128200;</span>Stats
+    </button>
+    <button class="tab-btn" data-view="settings" aria-label="Settings">
+      <span class="tab-ico">&#9881;&#65039;</span>Settings
+    </button>
+  </div>
+</nav>
+
+<!-- Save sheet -->
+<div class="backdrop" id="backdrop"></div>
+<form class="sheet" id="saveSheet" role="dialog" aria-modal="true" aria-label="Log a save" novalidate>
+  <div class="sheet-grip"></div>
+  <h2>What did you resist? &#128170;</h2>
+  <div class="amount-row" id="amountRow">
+    <span class="amount-cur" id="amountCur">$</span>
+    <input id="amountInput" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next" placeholder="0" aria-label="Amount">
+  </div>
+  <input id="labelInput" type="text" autocomplete="off" enterkeyhint="done" maxlength="60" placeholder="What was it? (e.g. Jacket)" aria-label="Label, optional">
+  <div class="sheet-actions">
+    <button type="button" class="btn-secondary" id="cancelSaveBtn">Cancel</button>
+    <button type="submit" class="btn-primary" id="confirmSaveBtn">Saved it!</button>
+  </div>
+</form>
+
+<!-- Import choice dialog -->
+<div class="choice" id="importChoice" role="dialog" aria-modal="true">
+  <h3>Import backup</h3>
+  <p id="importChoiceText"></p>
+  <div class="choice-btns">
+    <button class="c-primary" id="importMergeBtn">Merge with existing</button>
+    <button class="c-warn" id="importReplaceBtn">Replace everything</button>
+    <button class="c-plain" id="importCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- Erase confirm dialog -->
+<div class="choice" id="eraseChoice" role="dialog" aria-modal="true">
+  <h3>Erase all data?</h3>
+  <p>Every logged save will be deleted from this device. This cannot be undone.</p>
+  <div class="choice-btns">
+    <button class="c-warn" id="eraseConfirmBtn">Yes, erase everything</button>
+    <button class="c-plain" id="eraseCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+/* =========================================================
+   Saved It! — log the money you didn't spend.
+   Vanilla JS, IndexedDB (localStorage fallback), no deps.
+   ========================================================= */
+
+/* ---------------- Tiny helpers ---------------- */
+const $ = (id) => document.getElementById(id);
+const DAY_MS = 86400000;
+
+function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function uid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9); }
+function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+/* ---------------- Storage (IndexedDB + localStorage fallback) ---------------- */
+const Store = (() => {
+  const DB_NAME = 'saved-it';
+  const STORE = 'saves';
+  const LS_KEY = 'saved-it-entries';
+  let db = null;
+  let useLS = false;
+
+  function open() {
+    return new Promise((resolve) => {
+      if (!('indexedDB' in window)) { useLS = true; return resolve(); }
+      let req;
+      try { req = indexedDB.open(DB_NAME, 1); }
+      catch (e) { useLS = true; return resolve(); }
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains(STORE)) {
+          d.createObjectStore(STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = () => { db = req.result; resolve(); };
+      req.onerror = () => { useLS = true; resolve(); };
+      req.onblocked = () => { useLS = true; resolve(); };
+    });
+  }
+
+  function lsRead() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function lsWrite(entries) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(entries)); } catch (e) {}
+  }
+
+  function tx(mode) { return db.transaction(STORE, mode).objectStore(STORE); }
+
+  async function all() {
+    if (useLS || !db) return lsRead();
+    return new Promise((resolve) => {
+      const req = tx('readonly').getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve(lsRead());
+    });
+  }
+
+  async function put(entry) {
+    if (useLS || !db) {
+      const e = lsRead().filter((x) => x.id !== entry.id);
+      e.push(entry); lsWrite(e); return;
+    }
+    return new Promise((resolve, reject) => {
+      const req = tx('readwrite').put(entry);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function remove(id) {
+    if (useLS || !db) { lsWrite(lsRead().filter((x) => x.id !== id)); return; }
+    return new Promise((resolve, reject) => {
+      const req = tx('readwrite').delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function clear() {
+    if (useLS || !db) { lsWrite([]); return; }
+    return new Promise((resolve, reject) => {
+      const req = tx('readwrite').clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function bulkPut(entries) {
+    for (const e of entries) await put(e);
+  }
+
+  return { open, all, put, remove, clear, bulkPut, get backend() { return useLS ? 'localStorage' : 'IndexedDB'; } };
+})();
+
+/* ---------------- App state ---------------- */
+let entries = []; // {id, amount, label, ts}
+let displayedTotal = 0;
+let totalRaf = null;
+let pendingUndo = null; // {entry, timer}
+
+/* ---------------- Currency ---------------- */
+const CURRENCIES = ['USD','EUR','GBP','SEK','NOK','DKK','JPY','CNY','INR','CAD','AUD','NZD','CHF','BRL','MXN','PLN','KRW','TRY','ZAR','SGD'];
+const REGION_CURRENCY = {
+  US:'USD', GB:'GBP', SE:'SEK', NO:'NOK', DK:'DKK', JP:'JPY', CN:'CNY', IN:'INR',
+  CA:'CAD', AU:'AUD', NZ:'NZD', CH:'CHF', BR:'BRL', MX:'MXN', PL:'PLN', KR:'KRW',
+  TR:'TRY', ZA:'ZAR', SG:'SGD', DE:'EUR', FR:'EUR', ES:'EUR', IT:'EUR', NL:'EUR',
+  AT:'EUR', BE:'EUR', PT:'EUR', IE:'EUR', FI:'EUR', GR:'EUR', EE:'EUR', LV:'EUR',
+  LT:'EUR', SK:'EUR', SI:'EUR', LU:'EUR', MT:'EUR', CY:'EUR', HR:'EUR'
+};
+
+function guessCurrency() {
+  try {
+    const loc = new Intl.Locale(navigator.language || 'en-US');
+    const region = loc.region || (loc.maximize && loc.maximize().region);
+    if (region && REGION_CURRENCY[region]) return REGION_CURRENCY[region];
+  } catch (e) {}
+  return 'USD';
+}
+
+let currency = localStorage.getItem('saved-it-currency') || guessCurrency();
+
+function makeFmt(maxFrac) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: maxFrac, minimumFractionDigits: 0 }); }
+  catch (e) { return { format: (n) => currency + ' ' + n.toFixed(maxFrac) }; }
+}
+let fmtWhole = makeFmt(0);
+let fmtExact = makeFmt(2);
+
+function fmt(n) {
+  return Number.isInteger(Math.round(n * 100) / 100) && n % 1 === 0 ? fmtWhole.format(n) : fmtExact.format(n);
+}
+function refreshFormatters() { fmtWhole = makeFmt(0); fmtExact = makeFmt(2); }
+
+function currencySymbol() {
+  try {
+    const parts = new Intl.NumberFormat(undefined, { style: 'currency', currency }).formatToParts(1);
+    const sym = parts.find((p) => p.type === 'currency');
+    return sym ? sym.value : currency;
+  } catch (e) { return currency; }
+}
+
+/* ---------------- Derived data ---------------- */
+function totalSaved() { return entries.reduce((s, e) => s + e.amount, 0); }
+
+function calcStreaks() {
+  const days = new Set(entries.map((e) => dayKey(new Date(e.ts))));
+  // current streak: today counts; if nothing today, streak survives if saved yesterday
+  let cur = 0;
+  const cursor = startOfDay(new Date());
+  if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  while (days.has(dayKey(cursor))) { cur++; cursor.setDate(cursor.getDate() - 1); }
+  // best streak
+  const dates = [...days].map((k) => {
+    const p = k.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]);
+  }).sort((a, b) => a - b);
+  let best = 0, run = 0, prev = null;
+  for (const d of dates) {
+    if (prev) {
+      const expected = new Date(prev);
+      expected.setDate(expected.getDate() + 1);
+      run = dayKey(expected) === dayKey(d) ? run + 1 : 1;
+    } else run = 1;
+    if (run > best) best = run;
+    prev = d;
+  }
+  return { current: cur, best };
+}
+
+function monthlyTotals() {
+  const map = new Map();
+  for (const e of entries) {
+    const k = monthKey(new Date(e.ts));
+    const m = map.get(k) || { total: 0, count: 0 };
+    m.total += e.amount; m.count++;
+    map.set(k, m);
+  }
+  return map;
+}
+
+function relDate(ts) {
+  const today = startOfDay(new Date());
+  const that = startOfDay(new Date(ts));
+  const diff = Math.round((today - that) / DAY_MS);
+  if (diff <= 0) return 'today';
+  if (diff === 1) return 'yesterday';
+  if (diff < 7) return diff + 'd ago';
+  if (diff < 30) return Math.floor(diff / 7) + 'w ago';
+  try { return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: that.getFullYear() === today.getFullYear() ? undefined : 'numeric' }); }
+  catch (e) { return new Date(ts).toLocaleDateString(); }
+}
+
+const LABEL_EMOJI = [
+  [/coffee|latte|espresso|cappu/i, '☕'],
+  [/beer|wine|drink|cocktail|bar\b/i, '🍻'],
+  [/pizza|burger|food|lunch|dinner|snack|takeout|take-out|sushi|taco/i, '🍕'],
+  [/jacket|shirt|shoe|sneaker|dress|cloth|jeans|hoodie|hat\b/i, '🧥'],
+  [/game|console|playstation|xbox|nintendo|steam/i, '🎮'],
+  [/book|novel/i, '📚'],
+  [/phone|gadget|tech|laptop|headphone|earbud|watch/i, '📱'],
+  [/uber|taxi|ride|lyft/i, '🚕'],
+  [/candy|chocolate|sweet|dessert|cake|ice cream/i, '🍫'],
+  [/plant|flower/i, '🪴'],
+  [/toy|lego/i, '🧸'],
+  [/ticket|concert|movie|cinema/i, '🎫']
+];
+function emojiFor(label) {
+  if (label) for (const [re, em] of LABEL_EMOJI) if (re.test(label)) return em;
+  return '💸';
+}
+
+/* ---------------- Rendering ---------------- */
+function setTotal(value, animate) {
+  const el = $('totalAmount');
+  if (totalRaf) cancelAnimationFrame(totalRaf);
+  if (!animate) { displayedTotal = value; el.textContent = fmt(value); return; }
+  const from = displayedTotal;
+  const to = value;
+  const dur = 850;
+  const start = performance.now();
+  el.classList.remove('pop');
+  void el.offsetWidth; // restart animation
+  el.classList.add('pop');
+  function tick(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const p = 1 - Math.pow(1 - t, 4); // easeOutQuart
+    const v = from + (to - from) * p;
+    el.textContent = fmt(t === 1 ? to : v);
+    if (t < 1) totalRaf = requestAnimationFrame(tick);
+    else { displayedTotal = to; totalRaf = null; }
+  }
+  totalRaf = requestAnimationFrame(tick);
+}
+
+function renderStreakPill() {
+  const { current } = calcStreaks();
+  const pill = $('streakPill');
+  if (current >= 1) {
+    pill.innerHTML = '&#128293; ' + current + (current === 1 ? ' day streak' : ' day streak');
+    pill.classList.add('show');
+  } else {
+    pill.classList.remove('show');
+  }
+}
+
+function renderHistory() {
+  const list = $('historyList');
+  const sorted = [...entries].sort((a, b) => b.ts - a.ts);
+  list.textContent = '';
+  $('emptyState').hidden = sorted.length > 0;
+  $('histCount').textContent = sorted.length ? sorted.length + (sorted.length === 1 ? ' save' : ' saves') : '';
+  const frag = document.createDocumentFragment();
+  for (const e of sorted) frag.appendChild(buildEntryEl(e));
+  list.appendChild(frag);
+}
+
+function buildEntryEl(e) {
+  const li = document.createElement('li');
+  li.className = 'entry';
+  li.dataset.id = e.id;
+
+  const hint = document.createElement('div');
+  hint.className = 'swipe-hint';
+  hint.textContent = '🗑';
+  li.appendChild(hint);
+
+  const card = document.createElement('div');
+  card.className = 'entry-card';
+
+  const emoji = document.createElement('div');
+  emoji.className = 'entry-emoji';
+  emoji.textContent = emojiFor(e.label);
+
+  const main = document.createElement('div');
+  main.className = 'entry-main';
+  const lbl = document.createElement('div');
+  lbl.className = 'entry-label';
+  lbl.textContent = e.label || 'Resisted temptation';
+  const date = document.createElement('div');
+  date.className = 'entry-date';
+  date.textContent = relDate(e.ts);
+  main.appendChild(lbl); main.appendChild(date);
+
+  const amt = document.createElement('div');
+  amt.className = 'entry-amount';
+  amt.textContent = '+' + fmt(e.amount);
+
+  const del = document.createElement('button');
+  del.className = 'entry-del';
+  del.type = 'button';
+  del.setAttribute('aria-label', 'Delete ' + (e.label || 'entry'));
+  del.textContent = '×';
+  del.addEventListener('click', (ev) => { ev.stopPropagation(); deleteEntry(e.id); });
+
+  card.appendChild(emoji); card.appendChild(main); card.appendChild(amt); card.appendChild(del);
+  li.appendChild(card);
+  attachSwipe(li, card, e.id);
+  return li;
+}
+
+function renderStats() {
+  const now = new Date();
+  const months = monthlyTotals();
+  const thisKey = monthKey(now);
+  const thisMonth = months.get(thisKey) || { total: 0, count: 0 };
+  $('statMonthTotal').textContent = fmt(thisMonth.total);
+  $('statMonthCount').textContent = thisMonth.count + (thisMonth.count === 1 ? ' save' : ' saves');
+
+  let bestKey = null, bestVal = 0;
+  for (const [k, v] of months) if (v.total > bestVal) { bestVal = v.total; bestKey = k; }
+  if (bestKey) {
+    const p = bestKey.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, 1);
+    $('statBestMonth').textContent = fmt(bestVal);
+    $('statBestMonthName').textContent = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  } else {
+    $('statBestMonth').textContent = '–';
+    $('statBestMonthName').textContent = 'no saves yet';
+  }
+
+  const { current, best } = calcStreaks();
+  $('statCurStreak').textContent = current + (current === 1 ? ' day' : ' days');
+  $('statBestStreak').textContent = best + (best === 1 ? ' day' : ' days');
+
+  $('statAllCount').textContent = entries.length + (entries.length === 1 ? ' save' : ' saves') + ' · ' + fmt(totalSaved());
+  $('statAvg').textContent = entries.length ? 'avg ' + fmt(totalSaved() / entries.length) + ' per save' : 'go resist something!';
+
+  // 12-month bar chart
+  const chart = $('chart');
+  chart.textContent = '';
+  const cols = [];
+  let max = 0;
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const k = monthKey(d);
+    const v = (months.get(k) || { total: 0 }).total;
+    if (v > max) max = v;
+    cols.push({ d, k, v });
+  }
+  for (const c of cols) {
+    const col = document.createElement('div');
+    col.className = 'chart-col';
+    const track = document.createElement('div');
+    track.className = 'chart-bar-track';
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar' + (c.v === 0 ? ' zero' : '') + (c.k === thisKey ? ' current' : '');
+    bar.style.height = max > 0 ? Math.max(3, Math.round((c.v / max) * 100)) + '%' : '3%';
+    bar.title = c.d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) + ': ' + fmt(c.v);
+    track.appendChild(bar);
+    const label = document.createElement('div');
+    label.className = 'chart-label';
+    label.textContent = c.d.toLocaleDateString(undefined, { month: 'narrow' });
+    col.appendChild(track); col.appendChild(label);
+    chart.appendChild(col);
+  }
+}
+
+function renderAll(animateTotal) {
+  setTotal(totalSaved(), !!animateTotal);
+  renderStreakPill();
+  renderHistory();
+  if ($('view-stats').classList.contains('active')) renderStats();
+}
+
+/* ---------------- Confetti ---------------- */
+const Confetti = (() => {
+  const canvas = $('confettiCanvas');
+  const ctx = canvas.getContext('2d');
+  let parts = [];
+  let raf = null;
+  const COLORS = ['#10b981', '#34d399', '#6ee7b7', '#fbbf24', '#f59e0b', '#ffffff', '#fb7185'];
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function burst(x, y, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+      const speed = 7 + Math.random() * 9;
+      parts.push({
+        x, y,
+        vx: Math.cos(angle) * speed * (0.6 + Math.random() * 0.7),
+        vy: Math.sin(angle) * speed,
+        w: 5 + Math.random() * 6,
+        h: 8 + Math.random() * 6,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 0.35,
+        color: COLORS[(Math.random() * COLORS.length) | 0],
+        life: 0,
+        ttl: 110 + Math.random() * 50,
+        shape: Math.random() < 0.25 ? 'circle' : 'rect'
+      });
+    }
+    if (!raf) raf = requestAnimationFrame(step);
+  }
+
+  function step() {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    parts = parts.filter((p) => p.life < p.ttl && p.y < innerHeight + 40);
+    for (const p of parts) {
+      p.life++;
+      p.vy += 0.32;           // gravity
+      p.vx *= 0.985;          // drag
+      p.vy *= 0.992;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      const fade = p.life > p.ttl - 30 ? (p.ttl - p.life) / 30 : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      if (p.shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.life * 0.08)));
+      }
+      ctx.restore();
+    }
+    if (parts.length) raf = requestAnimationFrame(step);
+    else { raf = null; ctx.clearRect(0, 0, innerWidth, innerHeight); }
+  }
+
+  return { burst };
+})();
+
+/* ---------------- Toast ---------------- */
+const Toast = (() => {
+  const el = $('toast');
+  let hideTimer = null;
+  function show(msg, actionLabel, onAction, ms) {
+    clearTimeout(hideTimer);
+    el.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = msg;
+    el.appendChild(span);
+    if (actionLabel) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = actionLabel;
+      btn.addEventListener('click', () => { hide(); if (onAction) onAction(); });
+      el.appendChild(btn);
+    }
+    el.classList.add('show');
+    hideTimer = setTimeout(hide, ms || 3500);
+  }
+  function hide() { el.classList.remove('show'); }
+  return { show, hide };
+})();
+
+/* ---------------- Save flow ---------------- */
+const sheet = $('saveSheet');
+const backdrop = $('backdrop');
+
+function openSheet() {
+  $('amountCur').textContent = currencySymbol();
+  $('amountInput').value = '';
+  $('labelInput').value = '';
+  backdrop.classList.add('show');
+  sheet.classList.add('show');
+  // focus inside the user gesture so mobile keyboards open
+  $('amountInput').focus();
+}
+
+function closeSheet() {
+  backdrop.classList.remove('show');
+  sheet.classList.remove('show');
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();
+}
+
+function parseAmount(raw) {
+  if (!raw) return NaN;
+  let s = String(raw).trim().replace(/\s/g, '');
+  // tolerate "1.234,56" and "1,234.56" and "12,50"
+  const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+  if (lastComma > -1 && lastDot > -1) {
+    if (lastComma > lastDot) { s = s.replace(/\./g, '').replace(',', '.'); }
+    else { s = s.replace(/,/g, ''); }
+  } else if (lastComma > -1) {
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isFinite(n) ? Math.round(n * 100) / 100 : NaN;
+}
+
+async function commitSave() {
+  const amount = parseAmount($('amountInput').value);
+  if (!(amount > 0)) {
+    const row = $('amountRow');
+    row.classList.remove('shake');
+    void row.offsetWidth;
+    row.classList.add('shake');
+    vibrate(60);
+    $('amountInput').focus();
+    return;
+  }
+  const entry = {
+    id: uid(),
+    amount,
+    label: $('labelInput').value.trim().slice(0, 60),
+    ts: Date.now()
+  };
+  entries.push(entry);
+  closeSheet();
+  vibrate(20);
+
+  // celebrate from where the total lives
+  const rect = $('totalAmount').getBoundingClientRect();
+  Confetti.burst(rect.left + rect.width / 2, rect.top + rect.height / 2 + 10, 90);
+  setTimeout(() => Confetti.burst(innerWidth / 2, innerHeight * 0.7, 50), 120);
+
+  renderStreakPill();
+  setTotal(totalSaved(), true);
+  prependEntry(entry);
+  if ($('view-stats').classList.contains('active')) renderStats();
+
+  try {
+    await Store.put(entry);
+    requestPersistenceOnce();
+  } catch (err) {
+    Toast.show('Could not write to storage');
+  }
+}
+
+function prependEntry(entry) {
+  $('emptyState').hidden = true;
+  $('histCount').textContent = entries.length + (entries.length === 1 ? ' save' : ' saves');
+  const li = buildEntryEl(entry);
+  li.classList.add('adding');
+  $('historyList').prepend(li);
+}
+
+/* ---------------- Delete with undo ---------------- */
+async function deleteEntry(id) {
+  const idx = entries.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+  const entry = entries[idx];
+  entries.splice(idx, 1);
+
+  const li = document.querySelector('.entry[data-id="' + CSS.escape(id) + '"]');
+  if (li) {
+    li.style.maxHeight = li.offsetHeight + 'px';
+    li.classList.add('removing');
+    setTimeout(() => li.remove(), 290);
+  }
+  setTotal(totalSaved(), true);
+  renderStreakPill();
+  $('histCount').textContent = entries.length ? entries.length + (entries.length === 1 ? ' save' : ' saves') : '';
+  if (!entries.length) $('emptyState').hidden = false;
+  if ($('view-stats').classList.contains('active')) renderStats();
+
+  try { await Store.remove(id); } catch (e) {}
+  vibrate(15);
+
+  if (pendingUndo) clearTimeout(pendingUndo.timer);
+  pendingUndo = { entry, timer: setTimeout(() => { pendingUndo = null; }, 6000) };
+  Toast.show('Deleted ' + (entry.label ? '“' + entry.label + '”' : fmt(entry.amount)), 'Undo', async () => {
+    if (!pendingUndo) return;
+    const e = pendingUndo.entry;
+    clearTimeout(pendingUndo.timer);
+    pendingUndo = null;
+    entries.push(e);
+    try { await Store.put(e); } catch (err) {}
+    renderAll(true);
+  }, 6000);
+}
+
+/* ---------------- Swipe + long-press on rows ---------------- */
+function attachSwipe(li, card, id) {
+  let startX = 0, startY = 0, dx = 0, swiping = false, captured = false;
+  let pressTimer = null;
+
+  function clearPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+
+  card.addEventListener('pointerdown', (ev) => {
+    if (ev.button !== 0) return;
+    startX = ev.clientX; startY = ev.clientY; dx = 0; swiping = true; captured = false;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      swiping = false;
+      vibrate(30);
+      deleteEntry(id);
+    }, 550);
+  });
+
+  card.addEventListener('pointermove', (ev) => {
+    if (!swiping) return;
+    const mx = ev.clientX - startX;
+    const my = ev.clientY - startY;
+    if (!captured) {
+      if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.4) {
+        captured = true;
+        card.classList.add('dragging');
+        try { card.setPointerCapture(ev.pointerId); } catch (e) {}
+        clearPress();
+      } else if (Math.abs(my) > 10 || Math.abs(mx) > 10) {
+        clearPress(); // moved: not a long-press
+        if (Math.abs(my) > 10) { swiping = false; return; }
+      }
+    }
+    if (captured) {
+      dx = Math.min(0, mx); // left only
+      card.style.transform = 'translateX(' + dx + 'px)';
+    }
+  });
+
+  function release() {
+    clearPress();
+    if (!swiping && !captured) return;
+    swiping = false;
+    card.classList.remove('dragging');
+    if (captured && dx < -Math.min(110, li.offsetWidth * 0.32)) {
+      card.style.transform = 'translateX(-110%)';
+      setTimeout(() => deleteEntry(id), 120);
+    } else {
+      card.style.transform = '';
+    }
+    captured = false; dx = 0;
+  }
+  card.addEventListener('pointerup', release);
+  card.addEventListener('pointercancel', release);
+  card.addEventListener('lostpointercapture', release);
+  card.addEventListener('contextmenu', (ev) => ev.preventDefault());
+}
+
+/* ---------------- Persistence request ---------------- */
+let persistRequested = localStorage.getItem('saved-it-persist-requested') === '1';
+async function requestPersistenceOnce() {
+  if (persistRequested) return;
+  persistRequested = true;
+  localStorage.setItem('saved-it-persist-requested', '1');
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      await navigator.storage.persist();
+    }
+  } catch (e) {}
+  updateStorageStatus();
+}
+
+async function updateStorageStatus() {
+  const el = $('storageStatus');
+  let label = Store.backend;
+  let persistent = false;
+  try {
+    if (navigator.storage && navigator.storage.persisted) {
+      persistent = await navigator.storage.persisted();
+    }
+  } catch (e) {}
+  if (persistent) {
+    el.textContent = 'persistent ✓';
+    el.classList.add('good');
+  } else {
+    el.textContent = label + ' · best effort';
+    el.classList.remove('good');
+  }
+}
+
+/* ---------------- Export / import ---------------- */
+function exportJSON() {
+  const payload = {
+    app: 'saved-it',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    currency,
+    entries: [...entries].sort((a, b) => a.ts - b.ts)
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = url;
+  a.download = 'saved-it-backup-' + dayKey(d) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  Toast.show('Backup downloaded ⤓');
+}
+
+function sanitizeImported(raw) {
+  let list = null;
+  if (Array.isArray(raw)) list = raw;
+  else if (raw && Array.isArray(raw.entries)) list = raw.entries;
+  if (!list) return null;
+  const clean = [];
+  for (const e of list) {
+    if (!e || typeof e !== 'object') continue;
+    const amount = typeof e.amount === 'number' ? e.amount : parseFloat(e.amount);
+    const ts = typeof e.ts === 'number' ? e.ts : Date.parse(e.ts);
+    if (!isFinite(amount) || amount <= 0 || !isFinite(ts)) continue;
+    clean.push({
+      id: typeof e.id === 'string' && e.id ? e.id : uid(),
+      amount: Math.round(amount * 100) / 100,
+      label: typeof e.label === 'string' ? e.label.slice(0, 60) : '',
+      ts
+    });
+  }
+  return clean;
+}
+
+let stagedImport = null;
+
+function handleImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try { parsed = JSON.parse(reader.result); }
+    catch (e) { Toast.show('That file isn’t valid JSON'); return; }
+    const clean = sanitizeImported(parsed);
+    if (!clean || !clean.length) { Toast.show('No valid saves found in file'); return; }
+    stagedImport = clean;
+    $('importChoiceText').textContent = clean.length + (clean.length === 1 ? ' save' : ' saves') + ' found. Merge with your ' + entries.length + ' existing, or replace everything?';
+    $('importChoice').classList.add('show');
+    backdrop.classList.add('show');
+  };
+  reader.onerror = () => Toast.show('Could not read file');
+  reader.readAsText(file);
+}
+
+function closeImportChoice() {
+  $('importChoice').classList.remove('show');
+  backdrop.classList.remove('show');
+}
+
+async function applyImport(mode) {
+  if (!stagedImport) return closeImportChoice();
+  const incoming = stagedImport;
+  stagedImport = null;
+  closeImportChoice();
+  try {
+    if (mode === 'replace') {
+      await Store.clear();
+      entries = [];
+    }
+    const existing = new Set(entries.map((e) => e.id));
+    const fresh = incoming.filter((e) => !existing.has(e.id));
+    entries = entries.concat(fresh);
+    await Store.bulkPut(fresh);
+    renderAll(true);
+    Toast.show((mode === 'replace' ? 'Restored ' : 'Imported ') + fresh.length + (fresh.length === 1 ? ' save' : ' saves') + ' ✓');
+  } catch (e) {
+    Toast.show('Import failed');
+  }
+}
+
+/* ---------------- Erase ---------------- */
+async function eraseAll() {
+  try { await Store.clear(); } catch (e) {}
+  entries = [];
+  renderAll(false);
+  Toast.show('All data erased');
+}
+
+/* ---------------- Navigation ---------------- */
+function switchView(name) {
+  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-' + name));
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
+  if (name === 'stats') renderStats();
+  if (name === 'settings') updateStorageStatus();
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------------- Settings UI ---------------- */
+function buildCurrencySelect() {
+  const sel = $('currencySelect');
+  sel.textContent = '';
+  const list = CURRENCIES.includes(currency) ? CURRENCIES : [currency, ...CURRENCIES];
+  for (const c of list) {
+    const opt = document.createElement('option');
+    opt.value = c;
+    let label = c;
+    try {
+      const dn = new Intl.DisplayNames(undefined, { type: 'currency' });
+      label = c + ' – ' + dn.of(c);
+    } catch (e) {}
+    opt.textContent = label;
+    if (c === currency) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', () => {
+    currency = sel.value;
+    localStorage.setItem('saved-it-currency', currency);
+    refreshFormatters();
+    renderAll(false);
+    if ($('view-stats').classList.contains('active')) renderStats();
+    Toast.show('Currency set to ' + currency);
+  });
+}
+
+/* ---------------- Wire-up ---------------- */
+function bindEvents() {
+  $('openSaveBtn').addEventListener('click', openSheet);
+  $('cancelSaveBtn').addEventListener('click', closeSheet);
+  sheet.addEventListener('submit', (ev) => { ev.preventDefault(); commitSave(); });
+  $('amountInput').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); $('labelInput').focus(); }
+  });
+  backdrop.addEventListener('click', () => {
+    if ($('importChoice').classList.contains('show')) { stagedImport = null; closeImportChoice(); return; }
+    if ($('eraseChoice').classList.contains('show')) { $('eraseChoice').classList.remove('show'); backdrop.classList.remove('show'); return; }
+    closeSheet();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
+      if (sheet.classList.contains('show')) closeSheet();
+      if ($('importChoice').classList.contains('show')) { stagedImport = null; closeImportChoice(); }
+      if ($('eraseChoice').classList.contains('show')) { $('eraseChoice').classList.remove('show'); backdrop.classList.remove('show'); }
+    }
+  });
+
+  document.querySelectorAll('.tab-btn').forEach((b) => {
+    b.addEventListener('click', () => switchView(b.dataset.view));
+  });
+
+  $('exportBtn').addEventListener('click', exportJSON);
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (f) handleImportFile(f);
+    ev.target.value = '';
+  });
+  $('importMergeBtn').addEventListener('click', () => applyImport('merge'));
+  $('importReplaceBtn').addEventListener('click', () => applyImport('replace'));
+  $('importCancelBtn').addEventListener('click', () => { stagedImport = null; closeImportChoice(); });
+
+  $('eraseBtn').addEventListener('click', () => { $('eraseChoice').classList.add('show'); backdrop.classList.add('show'); });
+  $('eraseCancelBtn').addEventListener('click', () => { $('eraseChoice').classList.remove('show'); backdrop.classList.remove('show'); });
+  $('eraseConfirmBtn').addEventListener('click', () => {
+    $('eraseChoice').classList.remove('show'); backdrop.classList.remove('show');
+    eraseAll();
+  });
+
+  // refresh relative dates + streak when returning to the app
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { renderAll(false); }
+  });
+}
+
+/* ---------------- Boot ---------------- */
+(async function init() {
+  bindEvents();
+  buildCurrencySelect();
+  await Store.open();
+  entries = await Store.all();
+  renderAll(false);
+  updateStorageStatus();
+  $('aboutNote').textContent = 'Saved It! v1 · ' + Store.backend + ' · everything stays on this device';
+
+  if ('serviceWorker' in navigator) {
+    const registerSW = () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {
+        /* file:// or unsupported context — app still works, just not installable/offline */
+      });
+    };
+    if (docum
