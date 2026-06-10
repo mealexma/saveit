@@ -1415,4 +1415,10 @@ function bindEvents() {
         /* file:// or unsupported context — app still works, just not installable/offline */
       });
     };
-    if (docum
+    if (document.readyState === 'complete') registerSW();
+    else window.addEventListener('load', registerSW);
+  }
+})();
+</script>
+</body>
+</html>
