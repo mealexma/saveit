@@ -1,7 +1,7 @@
 /* Saved It! — service worker. Cache-first app shell, fully offline after first load. */
 'use strict';
 
-const CACHE_NAME = 'saved-it-v1';
+const CACHE_NAME = 'saved-it-v2';
 const SHELL = [
   './',
   './index.html',
@@ -13,7 +13,8 @@ const SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL))
+      // cache: 'reload' bypasses the HTTP cache so we never bake a stale copy into the shell
+      .then((cache) => cache.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -34,23 +35,18 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cached) => {
-      if (cached) return cached;
+      if (cached) {
+        // Stale-while-revalidate for navigations: serve cached shell instantly,
+        // refresh it in the background so updates land on the next visit.
+        if (req.mode === 'navigate') {
+          fetch(req).then((res) => {
+            if (res && res.ok) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, res));
+            }
+          }).catch(() => {});
+        }
+        return cached;
+      }
       return fetch(req)
         .then((res) => {
-          // Opportunistically cache same-origin successful responses.
-          if (res && res.ok && new URL(req.url).origin === self.location.origin) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => {
-          // Offline fallback: serve the app shell for navigations.
-          if (req.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-          return Response.error();
-        });
-    })
-  );
-});
+          // 
