@@ -49,4 +49,20 @@ self.addEventListener('fetch', (event) => {
       }
       return fetch(req)
         .then((res) => {
-          // 
+          // Opportunistically cache same-origin successful responses.
+          if (res && res.ok && new URL(req.url).origin === self.location.origin) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => {
+          // Offline fallback: serve the app shell for navigations.
+          if (req.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+          return Response.error();
+        });
+    })
+  );
+});
